@@ -1,0 +1,26 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# measurement data
+data/raw/
+*.csv.gz
+*.mf4
+
+# outputs
+reports/
+figures/
+
+# build artifacts
+*.egg-info/
+build/
+dist/
+
+# local only, not part of the framework
+CLAUDE.md
+LEARNING.md
+reference/
+docs/
+*.pptx
