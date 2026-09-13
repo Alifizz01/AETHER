@@ -1,0 +1,38 @@
+{
+  "_provenance": {
+    "origin": "GAIA, Scripts/battery_lib/cell.py, class-level lookup_table",
+    "converted": "percent -> 0..1 fraction, values otherwise verbatim",
+    "status": "NOMINAL SHAPES, NOT MEASURED DATA",
+    "warning": "No cell of yours produced these and no datasheet is cited. Use them to get the model running. Replace with your own pulse-test measurements before any number from this model goes into a report.",
+    "measured_at_c": null,
+    "added": "2026-09-13"
+  },
+  "soc_points": [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
+  "chemistries": {
+    "NMC": {
+      "ocv": [2.50, 3.00, 3.30, 3.50, 3.65, 3.75, 3.85, 3.95, 4.05, 4.15, 4.20],
+      "source": "GAIA lookup_table, nominal",
+      "note": "workhorse EV and drone chemistry. steady slope, no hard plateau."
+    },
+    "NCA": {
+      "ocv": [2.70, 3.20, 3.40, 3.55, 3.70, 3.80, 3.90, 4.00, 4.10, 4.15, 4.20],
+      "source": "GAIA lookup_table, nominal",
+      "note": "high energy density. sits slightly above NMC across the range."
+    },
+    "LFP": {
+      "ocv": [2.00, 2.50, 2.80, 3.00, 3.10, 3.20, 3.25, 3.30, 3.35, 3.40, 3.45],
+      "source": "GAIA lookup_table, nominal",
+      "note": "very flat from 40 to 90 percent, only 0.25 V across half the range. Voltage tells you almost nothing about SOC here, so coulomb counting or a Kalman filter is mandatory."
+    },
+    "LMO": {
+      "ocv": [2.50, 3.00, 3.30, 3.50, 3.65, 3.75, 3.85, 3.95, 4.05, 4.15, 4.20],
+      "source": "GAIA lookup_table, nominal",
+      "note": "WARNING: identical to NMC upstream, a copy-paste artifact in GAIA. Treat as a placeholder, not as an LMO curve."
+    },
+    "LTO": {
+      "ocv": [1.80, 2.00, 2.20, 2.30, 2.40, 2.50, 2.55, 2.60, 2.70, 2.75, 2.80],
+      "source": "GAIA lookup_table, nominal",
+      "note": "low voltage, long life, high power. Needs about 1.5x the cells in series for the same pack voltage."
+    }
+  }
+}

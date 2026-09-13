@@ -30,6 +30,7 @@ they are connected, and it solves for the point where all of them agree.
 | Module | State |
 |---|---|
 | `model/cell.py` | done. Rint cell, linear or measured OCV table |
+| `model/ocv_tables.py` | done. five chemistries from `data/ocv_tables.json` |
 | `model/pack.py` | done. s/p scaling, wiring resistance, sag, energy |
 | `model/motor.py` | done. steady-state PMSM, back-EMF, losses |
 | `model/inverter.py` | done. PWM-averaged, conduction + switching losses |
@@ -37,7 +38,7 @@ they are connected, and it solves for the point where all of them agree.
 | `model/powertrain.py` | electrical loop solved. mechanical loop needs the propeller |
 | `model/propeller.py` | **stub** |
 
-42 tests passing.
+49 tests passing.
 
 ## Quick start
 
@@ -58,11 +59,10 @@ aether/
   analysis/   sweeps, checks and figures. imports model, never the reverse.
   scenario/   missions and test points. Phase 2 lives here.
 tests/        one runnable check per piece of logic
+data/         OCV tables as JSON. read the _provenance block before trusting one
+data/raw/     bench measurements, Phase 3, gitignored
 figures/      generated PNGs, gitignored because they are reproducible
-data/raw/     bench measurements, Phase 3
 ```
-
-Local working material (study notes, reference photos, slides) is gitignored.
 
 Two rules keep it from rotting:
 

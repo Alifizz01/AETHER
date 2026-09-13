@@ -96,6 +96,10 @@ class Pack:
         finally:
             self.cell.soc = saved
         return self.series * (total / n) * self.capacity_ah()
+    
+    def voltage_at_current(self, i_load):
+        """Returns the terminal voltage at a given load current."""
+        return self.terminal_voltage(i_load)
 
     # ------------------------------------------------------------------ limits
     @property
