@@ -30,7 +30,6 @@ they are connected, and it solves for the point where all of them agree.
 | Module | State |
 |---|---|
 | `model/cell.py` | done. Rint cell, linear or measured OCV table |
-| `model/ocv_tables.py` | done. five chemistries from `data/ocv_tables.json` |
 | `model/pack.py` | done. s/p scaling, wiring resistance, sag, energy |
 | `model/motor.py` | done. steady-state PMSM, back-EMF, losses |
 | `model/inverter.py` | done. PWM-averaged, conduction + switching losses |
@@ -40,7 +39,7 @@ they are connected, and it solves for the point where all of them agree.
 | `analysis/validate.py` | done. freeze, compare, bias vs scatter |
 | `scenario/spec_1.json` | draft. bench correlation spec, 5 requirements |
 
-71 tests passing.
+64 tests passing.
 
 ## Quick start
 
@@ -61,7 +60,8 @@ aether/
   analysis/   sweeps, checks and figures. imports model, never the reverse.
   scenario/   missions, bench specs and test points. Phase 2 lives here.
 tests/        one runnable check per piece of logic
-data/         OCV tables as JSON. read the _provenance block before trusting one
+data/         OCV tables as JSON, five chemistries. no loader yet: read the
+              _provenance block before trusting a number
 data/raw/     bench measurements, Phase 3, gitignored
 figures/      generated PNGs, gitignored because they are reproducible
 ```
