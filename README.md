@@ -22,6 +22,14 @@ Started 2026-09-11.
                         BMS watches
 ```
 
+Give it one number, the duty, and it returns everything else:
+
+```python
+pt = Powertrain(pack, inverter, motor, propeller=prop)
+pt.solve_loaded(duty=0.6)      # -> rpm, thrust, torque, currents, losses, efficiency
+pt.duty_for_thrust(4.0)        # -> the duty a perfect controller would hold
+```
+
 Each block answers one question about itself. `Powertrain` is the only thing that knows
 they are connected, and it solves for the point where all of them agree.
 
@@ -34,12 +42,12 @@ they are connected, and it solves for the point where all of them agree.
 | `model/motor.py` | done. steady-state PMSM, back-EMF, losses |
 | `model/inverter.py` | done. PWM-averaged, conduction + switching losses |
 | `model/bms.py` | done. estimation, protection, latching faults |
-| `model/powertrain.py` | electrical loop solved. mechanical loop not wired up yet |
+| `model/powertrain.py` | done. electrical and mechanical loops both solved |
 | `model/propeller.py` | done. coefficient model, thrust/torque/FM/tip speed |
 | `analysis/validate.py` | done. freeze, compare, bias vs scatter |
 | `scenario/spec_1.json` | draft. bench correlation spec, 5 requirements |
 
-64 tests passing.
+74 tests passing.
 
 ## Quick start
 
