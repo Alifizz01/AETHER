@@ -1,0 +1,127 @@
+{
+  "_meta": {
+    "id": "SPEC-1",
+    "title": "Motor and inverter correlation, bench, fixed supply then pack",
+    "phase": 3,
+    "status": "DRAFT, written before any hardware exists",
+    "created": "2026-09-14",
+    "author": "Alifizz01",
+    "purpose": "Decide what must be measured, to what tolerance, and why, BEFORE buying sensors or running anything. Every tolerance here is provisional until the actual instruments are known.",
+    "discipline": "Predictions for these operating points are frozen to data/predicted_spec_1.json before the bench runs. A tolerance widened after seeing data is not a tolerance."
+  },
+
+  "setup": {
+    "device_under_test": "BLDC/PMSM motor + ESC, clamped, fan or brake load. NO PROPELLER.",
+    "load_type": "fan, so load torque ~ rpm^2, same law as a propeller",
+    "why_two_configurations": "Config A removes the pack from the loop so any disagreement is motor or inverter. Config B adds the pack. Errors that appear only in B belong to the pack model. Testing both at once cannot separate them.",
+    "configurations": {
+      "A": {
+        "supply": "bench power supply, constant voltage, current limited",
+        "u_bus_v": 14.8,
+        "exercises": ["motor", "inverter"],
+        "excludes": ["cell", "pack"]
+      },
+      "B": {
+        "supply": "4S LiPo pack",
+        "u_bus_v": "pack, sags under load",
+        "exercises": ["cell", "pack", "inverter", "motor"],
+        "excludes": []
+      }
+    },
+    "instruments": {
+      "_note": "accuracies below are PLACEHOLDERS. replace with the datasheet figure of the instrument actually bought, then revisit every tolerance.",
+      "u_bus": {"device": "DMM or scope", "assumed_accuracy": "0.5 %", "confirmed": false},
+      "i_dc": {"device": "inline shunt or hall sensor, logged", "assumed_accuracy": "2 %", "confirmed": false},
+      "rpm": {"device": "optical or hall sensor", "assumed_accuracy": "1 count", "confirmed": false},
+      "temp_c": {"device": "NTC or thermocouple on the motor case", "assumed_accuracy": "2 K", "confirmed": false}
+    }
+  },
+
+  "scenario": {
+    "name": "duty_sweep",
+    "description": "Step the ESC duty, let each point settle, log steady-state values.",
+    "settle_time_s": 20,
+    "log_time_s": 10,
+    "ambient_c": 25.0,
+    "points": [
+      {"id": "P1", "duty": 0.20},
+      {"id": "P2", "duty": 0.30},
+      {"id": "P3", "duty": 0.40},
+      {"id": "P4", "duty": 0.50},
+      {"id": "P5", "duty": 0.60},
+      {"id": "P6", "duty": 0.70},
+      {"id": "P7", "duty": 0.80},
+      {"id": "P8", "duty": 0.90}
+    ],
+    "order": "ascending, then descending, to expose thermal hysteresis between the two passes"
+  },
+
+  "requirements": [
+    {
+      "id": "REQ-01",
+      "signal": "i_dc",
+      "unit": "A",
+      "tolerance": {"type": "relative", "value": 0.10},
+      "applies_to": ["A", "B"],
+      "justification": "shunt accuracy 2 %, plus expected model error from holding winding resistance constant with temperature. The dominant term is the model, not the sensor.",
+      "falsifies": ["inverter loss model", "motor R_phase", "pack r_internal in config B"]
+    },
+    {
+      "id": "REQ-02",
+      "signal": "rpm",
+      "unit": "rpm",
+      "tolerance": {"type": "relative", "value": 0.05},
+      "applies_to": ["A", "B"],
+      "justification": "sensor is near exact. 5 % is model error, dominated by k_e being taken from datasheet Kv rather than measured.",
+      "falsifies": ["k_e", "fan load coefficient c_q"]
+    },
+    {
+      "id": "REQ-03",
+      "signal": "u_bus",
+      "unit": "V",
+      "tolerance": {"type": "relative", "value": 0.02},
+      "applies_to": ["B"],
+      "justification": "config A holds this constant by definition, so it only tests anything in B. Tight, because sag is a simple IR drop with nothing else in it. If this fails, r_internal or the wiring resistance is wrong.",
+      "falsifies": ["cell r_internal", "pack r_wiring"]
+    },
+    {
+      "id": "REQ-04",
+      "signal": "temp_c",
+      "unit": "degC",
+      "tolerance": {"type": "absolute", "value": 5.0},
+      "applies_to": ["A", "B"],
+      "justification": "absolute, not relative, because a relative tolerance on a temperature near ambient is meaningless. 5 K covers NTC placement on the case rather than in the winding, plus the missing thermal mass in the model.",
+      "falsifies": ["r_thermal", "total loss model"]
+    },
+    {
+      "id": "REQ-05",
+      "signal": "p_dc",
+      "unit": "W",
+      "tolerance": {"type": "relative", "value": 0.10},
+      "applies_to": ["A", "B"],
+      "justification": "derived from u_bus and i_dc, so NOT independent of REQ-01 and REQ-03. Kept because a power error that is not explained by either input signal indicates a timing or averaging mistake in the logging.",
+      "independent": false
+    }
+  ],
+
+  "safety_limits": {
+    "_note": "hard stops. exceeding any of these aborts the run, no exceptions.",
+    "u_bus_max_v": 60.0,
+    "motor_case_max_c": 80.0,
+    "cell_min_v": 3.3,
+    "i_max_a": "whichever is lower, ESC rating or motor rating",
+    "rules": [
+      "motor clamped down before power is applied",
+      "no propeller fitted at any time, fan or brake load only",
+      "LiPo charged in a fireproof bag, never unattended",
+      "DC bus current sensing verified working before anything spins"
+    ]
+  },
+
+  "acceptance": {
+    "per_point": "a point passes when every requirement applying to its configuration passes",
+    "overall": "SPEC-1 passes when all 8 points pass in both configurations",
+    "on_failure": "a failing requirement is not a defect until the residual is explained. Report the residual, its sign, and whether it is systematic or scattered. A systematic bias points at a wrong parameter; scatter points at the measurement.",
+    "deliverable": "one table of predicted vs measured per signal, the worst error, and a sentence naming the physical cause of any systematic bias"
+  }
+}

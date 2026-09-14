@@ -35,10 +35,12 @@ they are connected, and it solves for the point where all of them agree.
 | `model/motor.py` | done. steady-state PMSM, back-EMF, losses |
 | `model/inverter.py` | done. PWM-averaged, conduction + switching losses |
 | `model/bms.py` | done. estimation, protection, latching faults |
-| `model/powertrain.py` | electrical loop solved. mechanical loop needs the propeller |
-| `model/propeller.py` | **stub** |
+| `model/powertrain.py` | electrical loop solved. mechanical loop not wired up yet |
+| `model/propeller.py` | done. coefficient model, thrust/torque/FM/tip speed |
+| `analysis/validate.py` | done. freeze, compare, bias vs scatter |
+| `scenario/spec_1.json` | draft. bench correlation spec, 5 requirements |
 
-49 tests passing.
+71 tests passing.
 
 ## Quick start
 
@@ -57,7 +59,7 @@ python aether/analysis/inverter_analyser.py  # inverter loss split over a sweep
 aether/
   model/      physics. one module per block. returns numbers, never draws.
   analysis/   sweeps, checks and figures. imports model, never the reverse.
-  scenario/   missions and test points. Phase 2 lives here.
+  scenario/   missions, bench specs and test points. Phase 2 lives here.
 tests/        one runnable check per piece of logic
 data/         OCV tables as JSON. read the _provenance block before trusting one
 data/raw/     bench measurements, Phase 3, gitignored

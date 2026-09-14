@@ -81,10 +81,7 @@ class Cell_simple:
 
     def is_empty(self):
         return self.soc <= 0.0
-    
-    def voltage_at_current(self, i_load):
-        """Returns the terminal voltage at a given load current."""
-        return self.terminal_voltage(i_load)
+
 
 class Cell_advanced(Cell_simple):
     """Same cell, but OCV comes from a measured table instead of a straight line.
