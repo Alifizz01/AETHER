@@ -12,6 +12,10 @@ data/raw/
 # outputs
 reports/
 figures/
+aether/results/
+
+# editor
+.vscode/
 
 # build artifacts
 *.egg-info/

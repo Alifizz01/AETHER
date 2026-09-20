@@ -25,12 +25,12 @@ import statistics
 from datetime import datetime, timezone
 from pathlib import Path
 
-SPEC_DIR = Path(__file__).resolve().parents[1] / "scenario"
+SPEC_DIR = Path(__file__).resolve().parents[1] / "missions"
 
 
 # --------------------------------------------------------------------- spec
 def load_spec(path):
-    """Read a spec JSON (see aether/scenario/spec_1.json for the shape)."""
+    """Read a spec JSON (see aether/missions/spec_1.json for the shape)."""
     return json.loads(Path(path).read_text(encoding="utf-8"))
 
 

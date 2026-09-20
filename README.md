@@ -78,8 +78,16 @@ of adjustment.
 
 ![validation example](docs/img/validation_example.png)
 
-> The measured series in that figure is **synthetic**. There is no bench yet. It shows the
-> shape a Phase 3 report will take, not a result.
+> The measured series in that figure is **synthetic**. It shows the shape a Phase 3 report
+> will take, not a result from hardware.
+
+The whole loop already runs end to end against a **virtual bench**: `aether/hardware/`
+provides a `BenchInterface`, a `VirtualBench` that answers like a real rig, and a socket
+client and server speaking an ASCII or JSON wire protocol. `bench_sil_demo.py` drives
+SPEC-1 through it and writes a full correlation report.
+
+**So the software is ready for hardware.** Swap `VirtualBench` for `SocketBenchClient`
+pointed at a real rig and nothing else changes.
 
 The method, and the order matters more than the code:
 
@@ -103,7 +111,7 @@ systematic bias  ->  a parameter in the model is wrong
 scatter          ->  the measurement is noisy, or the rig is not settling
 ```
 
-The requirements live in [`aether/scenario/spec_1.json`](aether/scenario/spec_1.json), each
+The requirements live in [`aether/missions/spec_1.json`](aether/missions/spec_1.json), each
 with a tolerance, a justification, and the list of parameters it can falsify. Two
 configurations, so a disagreement can be attributed: config A runs on a fixed supply and
 removes the pack from the loop, config B adds it back.
@@ -114,11 +122,13 @@ removes the pack from the loop, config B adds it back.
 
 ```
 pip install -e .
-python -m pytest tests -q                      # 74 tests
+python -m pytest tests -q                      # 86 tests
 
 python aether/analysis/readme_figures.py       # regenerate the figures above
 python aether/analysis/capacity_demo.py        # why capacity is not the OCV curve
 python aether/analysis/load_types_demo.py      # constant R vs constant I vs constant P
+python aether/analysis/mission_demo.py         # fly a phased mission, get endurance and KPIs
+python aether/analysis/bench_sil_demo.py       # SPEC-1 against the virtual bench, full report
 ```
 
 ## Status
@@ -130,20 +140,25 @@ python aether/analysis/load_types_demo.py      # constant R vs constant I vs con
 | `model/motor.py` | done. steady-state PMSM, back-EMF, losses |
 | `model/inverter.py` | done. PWM-averaged, conduction + switching losses |
 | `model/propeller.py` | done. coefficient model, thrust, torque, figure of merit |
-| `model/powertrain.py` | done. electrical and mechanical loops both solved |
+| `model/powertrain.py` | done. electrical and mechanical loops, and the outer thrust loop |
 | `model/bms.py` | done. estimation, protection, latching faults |
+| `sim/simulator.py` | done. time-stepping missions, stop reasons, KPIs |
+| `hardware/` | done. bench interface, virtual bench, socket client/server, ASCII and JSON protocol |
 | `analysis/validate.py` | done. freeze, compare, bias vs scatter |
-| `scenario/spec_1.json` | draft. bench correlation spec, 5 requirements |
-| mission profiles | **not started.** Phase 2 |
+| `missions/spec_1.json` | draft. bench correlation spec, 5 requirements |
 | thermal propagation | **not started.** temperature exists per block, not through the chain |
+| Monte Carlo and sensitivity | **not started.** Phase 2 |
+| `cpp/` | **experimental stub.** one pybind11 binding, CMakeLists not written |
 
 ## Layout
 
 ```
 aether/
   model/      physics. one module per block. returns numbers, never draws.
-  analysis/   sweeps, checks and figures. imports model, never the reverse.
-  scenario/   missions, bench specs and test points. Phase 2 lives here.
+  sim/        the machinery that runs a model through time.
+  hardware/   bench interface: virtual bench, socket transport, wire protocol.
+  missions/   mission profiles and bench specs, as JSON.
+  analysis/   sweeps, checks, validation and figures. imports the rest, never the reverse.
 tests/        one runnable check per piece of logic
 data/         OCV tables as JSON. read the _provenance block before trusting a number
 data/raw/     bench measurements, Phase 3, gitignored

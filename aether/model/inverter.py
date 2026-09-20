@@ -39,10 +39,12 @@ class Inverter:
                 f"r_ds_on={self.r_ds_on} ohm, f_sw={self.f_sw/1000:.1f} kHz)")
 
     # ------------------------------------------------------------- conversion
-    def output_voltage(self, u_dc, duty):
+    def ac_voltage(self, u_dc, duty):
         """AC voltage the motor sees, averaged over a PWM period."""
         self._check_duty(duty)
         return duty * u_dc
+
+    output_voltage = ac_voltage
 
     # ------------------------------------------------------------------ losses
     def p_conduction(self, i_ac):

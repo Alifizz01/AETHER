@@ -20,14 +20,15 @@ import numpy as np
 
 class Cell_simple:
     def __init__(self, chemistry, capacity_ah, r_internal, u_full, u_empty,
-                 i_max, r_thermal=0.1, soc=1.0):
+                 i_max, r_thermal=0.1, soc=1.0, mass_kg=0.050):
         # --- what the cell is (attributes) ---
         self.chemistry = chemistry        # e.g. "LiPo", "NMC", "LFP". label for traceability
         self.capacity_ah = capacity_ah    # nominal capacity (Ah)
         self.r_internal = r_internal      # internal resistance (ohm)
         self.u_full = u_full              # OCV at soc = 1 (V)
         self.u_empty = u_empty            # OCV at soc = 0 (V)
-        self.i_max = i_max                # discharge limit (A)
+        self.i_max = i_max                # discharge limit (A)        
+        self.mass_kg = mass_kg            # cell mass (kg)
 
         # calibration knob: real cells sit in real airflow. measure this, do not trust it.
         self.r_thermal = r_thermal        # thermal resistance to ambient (degC/W)
@@ -37,7 +38,7 @@ class Cell_simple:
 
     def __repr__(self):
         return (f"{type(self).__name__}({self.chemistry}, {self.capacity_ah} Ah, "
-                f"{self.r_internal} ohm, soc={self.soc:.3f})")
+                f"{self.r_internal} ohm, {self.mass_kg*1000:.0f}g, soc={self.soc:.3f})")
 
     # ------------------------------------------------------------------ model
     def u_ocv(self):
@@ -95,7 +96,7 @@ class Cell_advanced(Cell_simple):
     """
 
     def __init__(self, chemistry, capacity_ah, r_internal, soc_points, ocv_points,
-                 i_max, r_thermal=0.1, soc=1.0):
+                 i_max, r_thermal=0.1, soc=1.0, mass_kg=0.050):
         soc_points = np.asarray(soc_points, dtype=float)
         ocv_points = np.asarray(ocv_points, dtype=float)
         self._validate(soc_points, ocv_points)
@@ -103,7 +104,7 @@ class Cell_advanced(Cell_simple):
         # the ends of the table ARE the full and empty voltages. no None needed.
         super().__init__(chemistry, capacity_ah, r_internal,
                          u_full=float(ocv_points[-1]), u_empty=float(ocv_points[0]),
-                         i_max=i_max, r_thermal=r_thermal, soc=soc)
+                         i_max=i_max, r_thermal=r_thermal, soc=soc, mass_kg=mass_kg)
 
         self.soc_points = soc_points
         self.ocv_points = ocv_points

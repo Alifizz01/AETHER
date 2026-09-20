@@ -66,6 +66,8 @@ def test_energy_matches_the_hand_number_for_a_linear_cell():
     # 6 * 3.75 * 6.0 Ah = 135 Wh
     assert pack.energy_wh() == pytest.approx(135.0, rel=1e-3)
     assert pack.soc() == 1.0                            # soc restored afterwards
+    assert pack.mass_kg() == pytest.approx(12 * 0.050 * 1.10)
+    assert pack.specific_energy_wh_kg() > 150.0
 
 
 def test_bad_wiring_is_rejected():

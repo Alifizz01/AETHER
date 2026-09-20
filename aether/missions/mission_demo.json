@@ -1,0 +1,73 @@
+{
+  "motor": {
+    "name": "Test Motor",
+    "k_e": 0.0106,
+    "R_phase": 0.05,
+    "i_no_load": 0.8,
+    "pole_pairs": 7,
+    "i_max": 35,
+    "v_max": 26.0,
+    "r_thermal": 0.5
+  },
+  "inverter": {
+    "name": "Test Inverter",
+    "i_max": 45,
+    "u_max": 30.0,
+    "r_ds_on": 0.004,
+    "n_conducting": 2,
+    "f_sw": 20000,
+    "e_sw": 5e-5,
+    "u_sw_ref": 26.0,
+    "i_sw_ref": 40.0
+  },
+  "cell": {
+    "chemistry": "NMC",
+    "capacity_ah": 3.0,
+    "r_internal": 0.020,
+    "u_full": 4.2,
+    "u_empty": 3.0,
+    "i_max": 35.0,
+    "r_thermal": 0.2
+  },
+  "pack": {
+    "name": "Test Pack",
+    "n_series": 6,
+    "n_parallel": 2,
+    "r_wiring": 0.010
+  },
+    "propeller": {
+    "name": "10x4.5 Propeller",
+    "diameter_in": 10.0,
+    "pitch_in": 4.5,
+    "c_t": 0.10,
+    "c_q": 0.0075,
+    "tip_speed_max": 240.0
+  },
+  "mission": {
+    "name": "Inspection Mission 1",
+    "description": "Climb, survey hover, wind dash, and descent",
+    "dt": 1.0,
+    "phases": [
+      {
+        "name": "takeoff_climb",
+        "duration_s": 10.0,
+        "thrust_n": 4.5
+      },
+      {
+        "name": "survey_hover",
+        "duration_s": 60.0,
+        "thrust_n": 2.94
+      },
+      {
+        "name": "dash_return",
+        "duration_s": 20.0,
+        "thrust_n": 4.0
+      },
+      {
+        "name": "controlled_descent",
+        "duration_s": 10.0,
+        "thrust_n": 2.0
+      }
+    ]
+  }
+}

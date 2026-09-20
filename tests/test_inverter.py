@@ -13,9 +13,9 @@ def make_inverter():
 def test_voltage_and_current_scale_by_duty():
     inv = make_inverter()
 
-    assert inv.output_voltage(48.0, 0.5) == pytest.approx(24.0)
-    assert inv.output_voltage(48.0, 1.0) == pytest.approx(48.0)
-    assert inv.output_voltage(48.0, 0.0) == pytest.approx(0.0)
+    assert inv.ac_voltage(48.0, 0.5) == pytest.approx(24.0)
+    assert inv.ac_voltage(48.0, 1.0) == pytest.approx(48.0)
+    assert inv.ac_voltage(48.0, 0.0) == pytest.approx(0.0)
 
 
 def test_losses_at_the_reference_point():
@@ -68,4 +68,4 @@ def test_limits_report_and_duty_is_validated():
     with pytest.raises(ValueError):
         inv.operating_point(u_dc=48.0, duty=1.5, i_ac=10.0)
     with pytest.raises(ValueError):
-        inv.output_voltage(48.0, -0.1)
+        inv.ac_voltage(48.0, -0.1)

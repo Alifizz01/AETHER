@@ -1,48 +1,14 @@
-"""Pack -> inverter -> motor, solved so all three agree.
-
-This class adds NO physics. Every equation lives in Pack, Inverter and Motor.
-What it adds is the solution to a circular problem:
-
-    i_dc  ->  pack sags   ->  u_dc
-    u_dc  ->  inverter    ->  u_ac = duty * u_dc
-    u_ac  ->  motor       ->  i_ac
-    i_ac  ->  inverter    ->  i_dc        back to the start
-
-Nothing can be computed first, so guess and iterate. The loop is
-self-correcting: more current sags the pack, which lowers u_ac, which lowers
-the current. Negative feedback, so the iteration contracts, but it OVERSHOOTS
-and rings, decaying only about 0.7 per pass on a soft pack. Taking a partial
-step instead of the full one (relaxation) kills the ringing and converges in
-around ten passes. It also keeps the solver stable if a stiffer motor or a
-softer pack ever pushes the raw loop gain past 1, where undamped iteration
-would diverge outright.
-
-With a Propeller attached there is a SECOND loop, mechanical this time:
-
-    motor torque falls with rpm        (its torque-speed line)
-    propeller torque rises with rpm^2  (its load line)
-
-They cross at exactly one rpm, and that crossing is where the shaft settles.
-Bisection finds it: the residual falls monotonically, so it cannot diverge.
-
-# simplification: steady state. No rotor inertia, so no spin-up transient, and
-# no PI controller. solve_loaded() lands directly on the equilibrium a perfectly
-# tuned controller would reach.
-"""
+"""Pack -> inverter -> motor -> propeller, solved so they all agree."""
 
 import math
 
 
 class NotConverged(RuntimeError):
-    """The solver ran out of iterations. Do not trust a half-solved point."""
+    """The solver ran out of iterations."""
 
 
 class ThrustUnreachable(RuntimeError):
-    """Even full duty cannot produce the demanded thrust.
-
-    Not a solver failure. It is the real end of flight: the pack has sagged far
-    enough that the controller has run out of adjustment.
-    """
+    """Even full duty cannot produce the demanded thrust."""
 
 
 class Powertrain:
@@ -50,137 +16,111 @@ class Powertrain:
         self.pack = pack
         self.inverter = inverter
         self.motor = motor
-        self.propeller = propeller      # optional: a clamped bench motor has none
-
-    def __repr__(self):
-        load = self.propeller.name if self.propeller else "no load"
-        return (f"Powertrain({self.pack.series}S{self.pack.parallel}P -> "
-                f"{self.inverter.name} -> {self.motor.name} -> {load})")
+        self.propeller = propeller
 
     def solve(self, duty, rpm, tol=1e-9, max_iter=200, relaxation=0.5):
-        """Find the operating point where pack, inverter and motor all agree.
-
-        duty and rpm are the inputs you control. Everything else is solved for.
-        relaxation is the fraction of each correction to actually take:
-        1.0 is the raw fixed point, lower is slower per step but stabler.
-        """
-        i_dc = 0.0                      # first guess: no load, pack un-sagged
-
+        i_dc = 0.0
         for iteration in range(1, max_iter + 1):
             u_dc = self.pack.terminal_voltage(i_dc)
-            u_ac = self.inverter.output_voltage(u_dc, duty)
-
+            u_ac = self.inverter.ac_voltage(u_dc, duty)
             mot = self.motor.operating_point(rpm, u_ac)
             inv = self.inverter.operating_point(u_dc, duty, mot["I"])
 
-            if abs(inv["i_dc"] - i_dc) < tol:
+            if abs(i_dc - inv["i_dc"]) < tol:
                 return self._assemble(duty, rpm, u_dc, mot, inv, iteration)
-            i_dc += relaxation * (inv["i_dc"] - i_dc)
+            i_dc = relaxation * inv["i_dc"] + (1 - relaxation) * i_dc
 
         raise NotConverged(
-            f"duty={duty}, rpm={rpm}: i_dc still moving after {max_iter} iterations")
+            f"duty={duty}, rpm={rpm}: i_dc still moving by "
+            f"{abs(inv['i_dc'] - i_dc):.3g} A after {max_iter} passes")
 
     def _assemble(self, duty, rpm, u_dc, mot, inv, iterations):
         """Collect the converged result. Bookkeeping only, no new physics."""
         p_pack_loss = self.pack.p_loss(inv["i_dc"])
-        p_pack_out = inv["p_dc"]                    # what leaves the pack terminals
-        p_pack_in = p_pack_out + p_pack_loss        # what the chemistry gave up
+        p_pack_in = inv["p_dc"] + p_pack_loss
 
         return {
             "duty": duty,
             "rpm": rpm,
             "iterations": iterations,
 
-            # electrical chain, in order
             "u_dc": u_dc,
             "i_dc": inv["i_dc"],
             "u_ac": inv["u_ac"],
-            "i_ac": inv["i_ac"],
+            "i_ac": mot["I"],
 
-            # mechanical output
             "torque": mot["torque"],
             "omega": mot["omega"],
             "p_mech": mot["P_out"],
 
-            # where the power went
             "p_pack_in": p_pack_in,
             "p_pack_loss": p_pack_loss,
             "p_inverter_loss": inv["p_loss"],
             "p_motor_loss": mot["P_copper"] + mot["P_noload"],
 
-            # efficiency of each stage and of the whole chain
             "eta_inverter": inv["eta"],
             "eta_motor": mot["eta"],
             "eta_total": mot["P_out"] / p_pack_in if p_pack_in > 0 else 0.0,
 
-            # limits, reported not raised
             "motor_over_current": mot["over_current"],
             "inverter_over_current": inv["over_current"],
         }
 
     def power_balance_error(self, point):
-        """Invariant across the whole chain. Must be ~0 at every operating point."""
         return point["p_pack_in"] - (point["p_mech"]
                                      + point["p_pack_loss"]
                                      + point["p_inverter_loss"]
                                      + point["p_motor_loss"])
 
-    # ----------------------------------------------------- mechanical loop
     def _require_propeller(self):
         if self.propeller is None:
-            raise ValueError("no propeller attached. use solve(duty, rpm) instead, "
-                             "or construct Powertrain(..., propeller=prop)")
-
-    def _rpm_ceiling(self, duty):
-        """An rpm the shaft certainly cannot exceed at this duty.
-
-        Uses the UN-sagged pack voltage, so the real no-load speed is always
-        lower and the bracket is guaranteed to contain the crossing.
-        """
-        u_ac_max = duty * self.pack.u_ocv()
-        return u_ac_max / self.motor.k_e * 60.0 / (2.0 * math.pi)
+            raise ValueError("no propeller attached: the mechanical loop cannot close")
 
     def torque_residual(self, duty, rpm, rho=1.225):
-        """Motor torque minus propeller torque at this rpm.
-
-        Positive means the motor is winning and the shaft accelerates.
-        Falls monotonically with rpm, which is what makes bisection safe.
-        """
+        """Leftover torque at this rpm. Positive means the shaft is still speeding up."""
         self._require_propeller()
-        return (self.solve(duty, rpm)["torque"]
-                - self.propeller.torque(rpm, rho))
+        point = self.solve(duty, rpm)
+        return point["torque"] - self.propeller.torque(rpm, rho)
+
+    def _no_load_rpm(self, duty):
+        """Upper bracket: the speed where back-EMF swallows the whole bus.
+
+        Uses the unsagged pack voltage, so it always overshoots the true
+        crossing. Overshooting is what makes it a valid bracket.
+        """
+        u_ac = self.inverter.ac_voltage(self.pack.terminal_voltage(0.0), duty)
+        return (u_ac / self.motor.k_e) * 60.0 / (2.0 * math.pi)
 
     def solve_loaded(self, duty, rho=1.225, tol_rpm=1e-6, max_iter=200):
-        """Where the shaft actually settles: motor torque = propeller torque.
+        """The rpm where motor torque equals propeller torque. Bisection.
 
-        duty is the only input. rpm is no longer given, it is solved for.
+        At rpm = 0 the motor makes stall torque and the propeller eats nothing,
+        so the residual is positive. At no-load rpm the motor makes nothing and
+        the propeller still eats, so it is negative. The crossing is trapped
+        between the two ends and cannot escape.
         """
         self._require_propeller()
-        if not 0.0 <= duty <= 1.0:
-            raise ValueError(f"duty must be between 0 and 1, got {duty}")
+        lo, hi = 0.0, self._no_load_rpm(duty)
+        mid = lo
 
-        lo = 0.0
-        if duty == 0.0 or self.torque_residual(duty, lo, rho) <= 0.0:
-            # the motor cannot even overcome its own no-load drag. it stays put.
-            return self._assemble_loaded(duty, 0.0, rho)
-
-        hi = self._rpm_ceiling(duty)
         for _ in range(max_iter):
             mid = 0.5 * (lo + hi)
+            if hi - lo < tol_rpm:
+                break
             if self.torque_residual(duty, mid, rho) > 0.0:
-                lo = mid
+                lo = mid          # motor still winning, the answer is higher
             else:
                 hi = mid
-            if hi - lo < tol_rpm:
-                return self._assemble_loaded(duty, 0.5 * (lo + hi), rho)
+        else:
+            raise NotConverged(
+                f"duty={duty}: rpm bracket still {hi - lo:.3g} wide "
+                f"after {max_iter} halvings")
 
-        raise NotConverged(f"duty={duty}: rpm bracket still {hi - lo:.3g} wide "
-                           f"after {max_iter} bisections")
+        return self._with_propeller(self.solve(duty, mid), rho)
 
-    def _assemble_loaded(self, duty, rpm, rho):
-        """Electrical point plus what the propeller is doing at that rpm."""
-        point = self.solve(duty, rpm)
-        prop = self.propeller.operating_point(rpm, rho)
+    def _with_propeller(self, point, rho):
+        """Add the mechanical side to an electrical result. Bookkeeping only."""
+        prop = self.propeller.operating_point(point["rpm"], rho)
         point.update({
             "rho": rho,
             "thrust": prop["thrust"],
@@ -193,39 +133,97 @@ class Powertrain:
         })
         return point
 
-    # --------------------------------------------------------- outer loop
-    def duty_for_thrust(self, thrust, rho=1.225, tol=1e-9, max_iter=200):
-        """The duty a perfect controller would hold to produce this thrust.
+    def shaft_power_error(self, point):
+        """The motor's output and the propeller's input are the same watts."""
+        return point["p_mech"] - point["prop_power"]
 
-        Raises ThrustUnreachable when even full duty falls short. That is not a
-        bug, it is duty saturation: the pack has sagged so far that the
-        controller has no adjustment left.
+    def duty_for_thrust(self, thrust, rho=1.225, tol=1e-9, max_iter=200):
+        """Invert the whole chain. Bisection again, this time on duty.
+
+        Thrust rises monotonically with duty, so the same guessing game works.
         """
         self._require_propeller()
         if thrust <= 0.0:
             return 0.0
 
-        best = self.solve_loaded(1.0, rho)["thrust"]
-        if best < thrust:
+        ceiling = self.solve_loaded(1.0, rho)["thrust"]
+        if thrust > ceiling:
             raise ThrustUnreachable(
-                f"full duty gives {best:.3f} N, {thrust:.3f} N demanded. "
-                f"pack at soc {self.pack.soc():.3f} cannot hold this thrust.")
+                f"{thrust:.4g} N demanded, {ceiling:.4g} N available at full duty")
 
         lo, hi = 0.0, 1.0
         for _ in range(max_iter):
             mid = 0.5 * (lo + hi)
+            if hi - lo < tol:
+                return mid
             if self.solve_loaded(mid, rho)["thrust"] < thrust:
                 lo = mid
             else:
                 hi = mid
-            if hi - lo < tol:
-                return 0.5 * (lo + hi)
 
-        raise NotConverged(f"thrust={thrust}: duty bracket still {hi - lo:.3g} wide")
+        raise NotConverged(
+            f"thrust={thrust}: duty bracket still {hi - lo:.3g} wide "
+            f"after {max_iter} halvings")
 
-    def shaft_power_error(self, point):
-        """Invariant: at the crossing, the motor's shaft power IS the propeller's.
+    # -------------------------------------------------------- mass & sizing
+    def hover_thrust_for_mass(self, total_mass_kg, n_rotors=4, g=9.81):
+        """Thrust required per rotor to hover an aircraft of given total mass.
 
-        If these disagree the bisection did not actually converge.
+        T_rotor = (total_mass * g) / n_rotors
         """
-        return point["p_mech"] - point["prop_power"]
+        return (total_mass_kg * g) / n_rotors
+
+    def hover_power_for_mass(self, total_mass_kg, n_rotors=4, rho=1.225, g=9.81):
+        """Solve hover operating point for one rotor carrying its share of total_mass.
+
+        Returns the full loaded point dictionary.
+        """
+        thrust_req = self.hover_thrust_for_mass(total_mass_kg, n_rotors=n_rotors, g=g)
+        duty = self.duty_for_thrust(thrust_req, rho=rho)
+        point = self.solve_loaded(duty, rho=rho)
+        point["thrust_demanded"] = thrust_req
+        point["hover_mass_share_kg"] = total_mass_kg / n_rotors
+        return point
+
+    def battery_weight_penalty(self, dry_mass_kg, n_rotors=4, rho=1.225,
+                               packaging_factor=1.10, g=9.81):
+        """Quantify the power and loss penalties caused specifically by the battery weight.
+
+        Compares:
+        1. Base aircraft (dry mass only, assuming hypothetical zero-mass energy source)
+        2. Real aircraft (dry mass + battery pack mass)
+
+        Returns a dictionary showing:
+        - battery_mass_kg: mass added by the battery
+        - delta_hover_thrust_n: additional thrust per rotor needed to lift the battery
+        - delta_p_electrical_w: extra DC electrical power needed due to battery weight (per rotor)
+        - delta_p_pack_loss_w: extra heat in the pack due to the higher current
+        - delta_p_motor_loss_w: extra copper/iron loss in the motor
+        - total_vehicle_delta_power_w: total extra power across all n_rotors
+        """
+        pack_m = self.pack.mass_kg(packaging_factor)
+        m_total = dry_mass_kg + pack_m
+
+        pt_with_batt = self.hover_power_for_mass(m_total, n_rotors=n_rotors, rho=rho, g=g)
+        pt_dry = self.hover_power_for_mass(dry_mass_kg, n_rotors=n_rotors, rho=rho, g=g)
+
+        delta_p_dc = pt_with_batt["i_dc"] * pt_with_batt["u_dc"] - pt_dry["i_dc"] * pt_dry["u_dc"]
+        delta_pack_loss = pt_with_batt["p_pack_loss"] - pt_dry["p_pack_loss"]
+        delta_motor_loss = pt_with_batt["p_motor_loss"] - pt_dry["p_motor_loss"]
+        delta_inv_loss = pt_with_batt["p_inverter_loss"] - pt_dry["p_inverter_loss"]
+        delta_thrust = pt_with_batt["thrust"] - pt_dry["thrust"]
+
+        return {
+            "dry_mass_kg": dry_mass_kg,
+            "battery_mass_kg": pack_m,
+            "total_mass_kg": m_total,
+            "battery_mass_fraction": pack_m / m_total,
+            "delta_thrust_per_rotor_n": delta_thrust,
+            "delta_p_dc_per_rotor_w": delta_p_dc,
+            "delta_p_pack_loss_w": delta_pack_loss,
+            "delta_p_motor_loss_w": delta_motor_loss,
+            "delta_p_inverter_loss_w": delta_inv_loss,
+            "total_vehicle_delta_power_w": delta_p_dc * n_rotors,
+            "hover_point_with_battery": pt_with_batt,
+            "hover_point_dry": pt_dry,
+        }

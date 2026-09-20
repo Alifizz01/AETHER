@@ -74,6 +74,21 @@ class Pack:
         return self.terminal_voltage(i_load) * i_load
 
     # ------------------------------------------------------------------ sizing
+    def mass_kg(self, packaging_factor=1.10):
+        """Total pack mass (kg), including packaging overhead.
+
+        Cells are series * parallel. packaging_factor defaults to 1.10 (10% extra)
+        for busbars, heat shrink, wires, and connectors.
+        """
+        n_cells = self.series * self.parallel
+        cell_mass = getattr(self.cell, "mass_kg", 0.050)
+        return n_cells * cell_mass * packaging_factor
+
+    def specific_energy_wh_kg(self, packaging_factor=1.10):
+        """Gravimetric specific energy of the assembled pack (Wh/kg)."""
+        m = self.mass_kg(packaging_factor)
+        return self.energy_wh() / m if m > 0 else 0.0
+
     def capacity_ah(self):
         return self.parallel * self.cell.capacity_ah
 
